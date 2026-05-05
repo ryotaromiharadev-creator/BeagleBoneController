@@ -5,11 +5,17 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.linuxconnect.model.ServerInfo
 import com.example.linuxconnect.network.ServiceDiscovery
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.net.InetSocketAddress
+import java.net.Socket
 
 class DiscoveryViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -24,17 +30,33 @@ class DiscoveryViewModel(application: Application) : AndroidViewModel(applicatio
     private var scanJob: Job? = null
 
     fun startDiscovery() {
-        scanJob?.cancel()          // 旧 Flow をキャンセル → awaitClose で NSD 停止
+        scanJob?.cancel()
         _servers.value = emptyList()
         scanJob = viewModelScope.launch {
-            delay(200)             // NSD が完全停止するのを待ってから再起動
+            delay(200)
             _isScanning.value = true
-            launch {
-                delay(3_000)       // 初回スキャン期間 3 秒後にボタンを有効化
-                _isScanning.value = false
-            }
-            discovery.discoverServices().collect { list ->
-                _servers.value = list
+            launch { delay(3_000); _isScanning.value = false }
+
+            discovery.discoverServices().collect { rawList ->
+                // onServiceLost による削除はそのまま反映
+                val removed = _servers.value.filter { known ->
+                    rawList.none { it.host == known.host && it.port == known.port }
+                }
+
+                // 未検証のサーバーだけ TCP プローブ（並列）
+                val toProbe = rawList.filter { candidate ->
+                    _servers.value.none { it.host == candidate.host && it.port == candidate.port }
+                }
+
+                val verified = if (toProbe.isNotEmpty()) {
+                    withContext(Dispatchers.IO) {
+                        toProbe.map { server ->
+                            async { server.takeIf { isReachable(it.host, it.port) } }
+                        }.awaitAll().filterNotNull()
+                    }
+                } else emptyList()
+
+                _servers.value = (_servers.value - removed.toSet()) + verified
             }
         }
     }
@@ -43,6 +65,12 @@ class DiscoveryViewModel(application: Application) : AndroidViewModel(applicatio
         scanJob?.cancel()
         _isScanning.value = false
     }
+
+    private fun isReachable(host: String, port: Int): Boolean =
+        runCatching {
+            Socket().use { it.connect(InetSocketAddress(host, port), 1000) }
+            true
+        }.getOrDefault(false)
 
     override fun onCleared() {
         super.onCleared()
