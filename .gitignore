@@ -1,0 +1,17 @@
+# Android build artifacts
+AndroidApp/.gradle/
+AndroidApp/.idea/caches/
+AndroidApp/app/build/
+AndroidApp/local.properties
+
+# Linux compiled binary
+LinuxApp/rc_server
+LinuxApp/bench_recv
+LinuxApp/.packages/
+
+# Claude settings
+.claude/
+
+# Python cache
+__pycache__/
+*.pyc
