@@ -67,9 +67,8 @@ fun DiscoveryScreen(
         label = "rotation",
     )
 
-    LaunchedEffect(Unit) {
-        viewModel.startDiscovery()
-    }
+    // 初回表示時はスキャンしない — ボタンを押したときだけ検索する
+    // （前回の結果があればそのまま表示）
 
     LazyColumn(
         modifier = Modifier

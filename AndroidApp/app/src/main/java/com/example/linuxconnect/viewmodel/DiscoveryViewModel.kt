@@ -31,44 +31,40 @@ class DiscoveryViewModel(application: Application) : AndroidViewModel(applicatio
     private var scanJob: Job? = null
 
     fun startDiscovery() {
+        if (_isScanning.value) return   // 二重タップ防止
         scanJob?.cancel()
-        _servers.value = emptyList()
+        _isScanning.value = true
+        // _servers はクリアしない — スキャン完了まで前回の結果を表示し続ける
 
         scanJob = viewModelScope.launch {
-            delay(200)              // 旧 NSD が完全停止するのを待つ
-            _isScanning.value = true
-
-            // mDNS をバックグラウンドで監視し続ける（キャッシュ含む全結果を追加）
-            launch {
+            // mDNS を 3 秒間収集（キャッシュ含む全サービスが応答する時間）
+            val found = mutableListOf<ServerInfo>()
+            val mDnsJob = launch {
                 discovery.discoverServices().collect { rawList ->
-                    val added = rawList.filter { s ->
-                        _servers.value.none { it.host == s.host && it.port == s.port }
+                    synchronized(found) {
+                        found.clear()
+                        found.addAll(rawList)
                     }
-                    val removed = _servers.value.filter { k ->
-                        rawList.none { it.host == k.host && it.port == k.port }
+                }
+            }
+            delay(3000)
+            mDnsJob.cancel()    // mDNS 停止（次回再スキャン時にキャッシュなし再起動）
+
+            // 見つかったサーバーを並列 TCP プローブ（最大 2 秒タイムアウト）
+            val snapshot = synchronized(found) { found.toList() }
+            _servers.value = if (snapshot.isEmpty()) {
+                emptyList()
+            } else {
+                withContext(Dispatchers.IO) {
+                    coroutineScope {
+                        snapshot.map { server ->
+                            async { server.takeIf { isReachable(it.host, it.port) } }
+                        }.awaitAll().filterNotNull()
                     }
-                    _servers.value = (_servers.value - removed.toSet()) + added
                 }
             }
 
-            // 2 秒待ってからプローブ（ネットワーク安定後に実行）
-            delay(2000)
-            pruneDeadServers()
             _isScanning.value = false
-            // 以後も mDNS 監視は継続（新規サーバーを自動追加）
-        }
-    }
-
-    // 現在のリストを並列 TCP プローブし、応答しないサーバーを除去する
-    private suspend fun pruneDeadServers() {
-        val snapshot = _servers.value
-        if (snapshot.isEmpty()) return
-        _servers.value = withContext(Dispatchers.IO) {
-            coroutineScope {
-                snapshot.map { server ->
-                    async { server.takeIf { isReachable(it.host, it.port) } }
-                }.awaitAll().filterNotNull()
-            }
         }
     }
 
