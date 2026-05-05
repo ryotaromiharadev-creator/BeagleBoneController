@@ -3,12 +3,10 @@ package com.example.linuxconnect.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,7 +15,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -42,7 +39,6 @@ fun DiscoveryScreen(
     viewModel: DiscoveryViewModel = viewModel(),
 ) {
     val servers by viewModel.servers.collectAsState()
-    val probingServer by viewModel.probingServer.collectAsState()
 
     LazyColumn(
         modifier = Modifier
@@ -87,8 +83,7 @@ fun DiscoveryScreen(
             items(servers) { server ->
                 ServerCard(
                     server = server,
-                    isProbing = probingServer == server,
-                    onClick = { viewModel.connectToServer(server, onServerSelected) },
+                    onClick = { onServerSelected(server) },
                 )
             }
         }
@@ -168,30 +163,19 @@ private fun ManualConnectCard(onConnect: (ServerInfo) -> Unit) {
 }
 
 @Composable
-private fun ServerCard(server: ServerInfo, isProbing: Boolean, onClick: () -> Unit) {
+private fun ServerCard(server: ServerInfo, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = !isProbing, onClick = onClick),
+            .clickable(onClick = onClick),
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = server.name, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    text = "${server.host}:${server.port}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (isProbing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                )
-            }
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = server.name, style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = "${server.host}:${server.port}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
