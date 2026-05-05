@@ -40,7 +40,10 @@ class ServiceDiscovery(context: Context) {
 
                     override fun onServiceResolved(si: NsdServiceInfo) {
                         val host = si.host?.hostAddress
-                        if (host != null) {
+                        if (host == null) {
+                            Log.w(TAG, "Resolved ${si.serviceName} but host is null — skipping")
+                        } else {
+                            Log.d(TAG, "Resolved: ${si.serviceName} @ $host:${si.port}")
                             val server = ServerInfo(si.serviceName, host, si.port)
                             if (servers.none { it.host == host && it.port == si.port }) {
                                 servers.add(server)
