@@ -29,10 +29,13 @@ class DiscoveryViewModel(application: Application) : AndroidViewModel(applicatio
         scanJob = viewModelScope.launch {
             delay(200)             // NSD が完全停止するのを待ってから再起動
             _isScanning.value = true
+            launch {
+                delay(3_000)       // 初回スキャン期間 3 秒後にボタンを有効化
+                _isScanning.value = false
+            }
             discovery.discoverServices().collect { list ->
                 _servers.value = list
             }
-            _isScanning.value = false
         }
     }
 
