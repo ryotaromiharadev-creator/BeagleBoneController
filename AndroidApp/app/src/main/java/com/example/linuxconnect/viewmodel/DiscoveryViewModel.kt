@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,31 +33,41 @@ class DiscoveryViewModel(application: Application) : AndroidViewModel(applicatio
     fun startDiscovery() {
         scanJob?.cancel()
         _servers.value = emptyList()
+
         scanJob = viewModelScope.launch {
-            delay(200)
+            delay(200)              // 旧 NSD が完全停止するのを待つ
             _isScanning.value = true
-            launch { delay(3_000); _isScanning.value = false }
 
-            discovery.discoverServices().collect { rawList ->
-                // onServiceLost による削除はそのまま反映
-                val removed = _servers.value.filter { known ->
-                    rawList.none { it.host == known.host && it.port == known.port }
-                }
-
-                // 未検証のサーバーだけ TCP プローブ（並列）
-                val toProbe = rawList.filter { candidate ->
-                    _servers.value.none { it.host == candidate.host && it.port == candidate.port }
-                }
-
-                val verified = if (toProbe.isNotEmpty()) {
-                    withContext(Dispatchers.IO) {
-                        toProbe.map { server ->
-                            async { server.takeIf { isReachable(it.host, it.port) } }
-                        }.awaitAll().filterNotNull()
+            // mDNS をバックグラウンドで監視し続ける（キャッシュ含む全結果を追加）
+            launch {
+                discovery.discoverServices().collect { rawList ->
+                    val added = rawList.filter { s ->
+                        _servers.value.none { it.host == s.host && it.port == s.port }
                     }
-                } else emptyList()
+                    val removed = _servers.value.filter { k ->
+                        rawList.none { it.host == k.host && it.port == k.port }
+                    }
+                    _servers.value = (_servers.value - removed.toSet()) + added
+                }
+            }
 
-                _servers.value = (_servers.value - removed.toSet()) + verified
+            // 2 秒待ってからプローブ（ネットワーク安定後に実行）
+            delay(2000)
+            pruneDeadServers()
+            _isScanning.value = false
+            // 以後も mDNS 監視は継続（新規サーバーを自動追加）
+        }
+    }
+
+    // 現在のリストを並列 TCP プローブし、応答しないサーバーを除去する
+    private suspend fun pruneDeadServers() {
+        val snapshot = _servers.value
+        if (snapshot.isEmpty()) return
+        _servers.value = withContext(Dispatchers.IO) {
+            coroutineScope {
+                snapshot.map { server ->
+                    async { server.takeIf { isReachable(it.host, it.port) } }
+                }.awaitAll().filterNotNull()
             }
         }
     }
@@ -68,7 +79,7 @@ class DiscoveryViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun isReachable(host: String, port: Int): Boolean =
         runCatching {
-            Socket().use { it.connect(InetSocketAddress(host, port), 1000) }
+            Socket().use { it.connect(InetSocketAddress(host, port), 2000) }
             true
         }.getOrDefault(false)
 
