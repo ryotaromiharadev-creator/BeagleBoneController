@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -40,6 +42,7 @@ fun DiscoveryScreen(
     viewModel: DiscoveryViewModel = viewModel(),
 ) {
     val servers by viewModel.servers.collectAsState()
+    val probingServer by viewModel.probingServer.collectAsState()
 
     LazyColumn(
         modifier = Modifier
@@ -82,7 +85,11 @@ fun DiscoveryScreen(
             }
         } else {
             items(servers) { server ->
-                ServerCard(server = server, onClick = { onServerSelected(server) })
+                ServerCard(
+                    server = server,
+                    isProbing = probingServer == server,
+                    onClick = { viewModel.connectToServer(server, onServerSelected) },
+                )
             }
         }
 
@@ -161,19 +168,30 @@ private fun ManualConnectCard(onConnect: (ServerInfo) -> Unit) {
 }
 
 @Composable
-private fun ServerCard(server: ServerInfo, onClick: () -> Unit) {
+private fun ServerCard(server: ServerInfo, isProbing: Boolean, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(enabled = !isProbing, onClick = onClick),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = server.name, style = MaterialTheme.typography.titleSmall)
-            Text(
-                text = "${server.host}:${server.port}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = server.name, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = "${server.host}:${server.port}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (isProbing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                )
+            }
         }
     }
 }
