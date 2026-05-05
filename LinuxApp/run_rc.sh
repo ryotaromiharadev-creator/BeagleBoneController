@@ -11,8 +11,9 @@ if [ ! -f rc_server ]; then
     make rc_server
 fi
 
-# Start mDNS advertiser in background
-python3 mdns_rc.py &
+# Start mDNS advertiser in background (stdout/stderr suppressed to avoid
+# disrupting rc_server's terminal cursor positioning)
+python3 mdns_rc.py >/dev/null 2>&1 &
 MDNS_PID=$!
 
 cleanup() {
