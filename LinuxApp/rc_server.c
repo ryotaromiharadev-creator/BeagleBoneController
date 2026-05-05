@@ -26,6 +26,7 @@
  */
 
 #include <arpa/inet.h>
+#include <errno.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <signal.h>
@@ -205,6 +206,10 @@ int main(void) {
     int yes = 1;
     setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
 
+    /* recvfrom を 50ms でタイムアウトさせ、通信断でも render/watchdog 表示が更新されるようにする */
+    struct timeval tv = { .tv_sec = 0, .tv_usec = 50000 };
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family      = AF_INET;
@@ -244,7 +249,11 @@ int main(void) {
     while (running) {
         ssize_t n = recvfrom(sock, buf, sizeof(buf), 0,
                              (struct sockaddr *)&client, &clen);
-        if (n != 2) continue;
+        if (n != 2) {
+            /* SO_RCVTIMEO タイムアウト → パケットなしでも render を通す */
+            if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) goto do_render;
+            continue;
+        }
 
         thr = (int8_t)buf[0];
         str = (int8_t)buf[1];
@@ -264,6 +273,7 @@ int main(void) {
          * rc_motor_set(2, r / 127.0);
          * ------------------------------------------------------------------ */
 
+        do_render:
         clock_gettime(CLOCK_MONOTONIC, &t_now);
         long elapsed = (t_now.tv_sec  - t_last_render.tv_sec)  * 1000000000L
                      + (t_now.tv_nsec - t_last_render.tv_nsec);
