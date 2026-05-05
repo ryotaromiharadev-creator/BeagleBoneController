@@ -185,12 +185,15 @@ static void draw_bar(int8_t val) {
 
 static void render(int8_t thr, int8_t str, long pkts, double uptime) {
     static int first = 1;
-    if (first) {
-        printf("\033[s");   /* 初回: この位置を保存してから4行描画 */
-        first = 0;
-    } else {
-        printf("\033[u");   /* 2回目以降: 保存位置に戻って上書き */
+    if (!first) {
+        /* STATUS行(カーソル位置)から1行ずつ消去しながらTHROTTLE行まで戻る。
+         * \n なしで止めているのでスクロールが発生しない。 */
+        printf("\033[2K\r"           /* STATUS 行クリア              */
+               "\033[A\033[2K\r"    /* ↑pkts 行クリア               */
+               "\033[A\033[2K\r"    /* ↑STEERING 行クリア           */
+               "\033[A\033[2K\r");  /* ↑THROTTLE 行クリア・先頭へ   */
     }
+    first = 0;
 
     printf("\033[2K\rTHROTTLE %+4d  ", thr);
     draw_bar(thr);
@@ -202,16 +205,16 @@ static void render(int8_t thr, int8_t str, long pkts, double uptime) {
 
     printf("\033[2K\rpkts: %-8ld  uptime: %6.1f s\n", pkts, uptime);
 
-    /* STATUS 行: watchdog 発動中かどうかを表示 */
+    /* STATUS行は \n なし — カーソルをこの行に留めてスクロールを防ぐ */
     int watchdog = g_client_known &&
                    (time(NULL) - g_last_recv_sec > WATCHDOG_SEC);
     if (watchdog)
-        printf("\033[2K\r\033[31mSTATUS: *** WATCHDOG — 通信断, モーター停止 ***\033[0m\n");
+        printf("\033[2K\r\033[31mSTATUS: *** WATCHDOG — 通信断, モーター停止 ***\033[0m");
     else if (g_client_known)
-        printf("\033[2K\r\033[32mSTATUS: ONLINE  (last pkt %lus ago)\033[0m\n",
+        printf("\033[2K\r\033[32mSTATUS: ONLINE  (last pkt %lus ago)\033[0m",
                (unsigned long)(time(NULL) - g_last_recv_sec));
     else
-        printf("\033[2K\rSTATUS: waiting for Android...\n");
+        printf("\033[2K\rSTATUS: waiting for Android...");
 
     fflush(stdout);
 }
