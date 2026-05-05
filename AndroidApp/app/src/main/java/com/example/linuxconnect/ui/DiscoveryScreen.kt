@@ -23,12 +23,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -91,42 +92,38 @@ fun DiscoveryScreen(
         }
 
         item {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+            Text("自動検出 (mDNS)", style = MaterialTheme.typography.titleSmall)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            /* ── 再スキャンボタン ── */
+            OutlinedButton(
+                onClick = { viewModel.startDiscovery() },
+                enabled = !isScanning,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column {
-                    Text("自動検出 (mDNS)", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        text = if (isScanning) "スキャン中..." else "${servers.size} 台検出",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                IconButton(
-                    onClick = { viewModel.startDiscovery() },
-                    enabled = !isScanning,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "再スキャン",
-                        modifier = Modifier
-                            .size(24.dp)
-                            .rotate(if (isScanning) rotation else 0f),
-                        tint = if (isScanning)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurface,
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(18.dp)
+                        .rotate(if (isScanning) rotation else 0f),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(if (isScanning) "スキャン中..." else "再スキャン（キャッシュなし）")
             }
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = if (isScanning) "ネットワークに問い合わせ中..." else "${servers.size} 台検出",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         if (servers.isEmpty()) {
             item {
                 Text(
-                    text = if (isScanning) "検索中..." else "サーバが見つかりません (Tailscale使用時は手動入力)",
+                    text = if (isScanning) "" else "サーバが見つかりません (Tailscale使用時は手動入力)",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 4.dp),

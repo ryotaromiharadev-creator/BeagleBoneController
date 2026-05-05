@@ -16,6 +16,12 @@ class ServiceDiscovery(context: Context) {
 
     private val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
 
+    /**
+     * mDNS スキャンを開始し、サーバーリストを Flow で返す。
+     * Flow がキャンセルされると NSD を停止し、Android の mDNS キャッシュをクリアする。
+     * 再スキャン時は ViewModel 側でこの Flow を cancel → 再収集することで
+     * NSD を完全に停止 → 再起動し、キャッシュに依存しない新規クエリを発行する。
+     */
     fun discoverServices(): Flow<List<ServerInfo>> = callbackFlow {
         val servers = mutableListOf<ServerInfo>()
         val resolveQueue = ArrayDeque<NsdServiceInfo>()
@@ -82,7 +88,10 @@ class ServiceDiscovery(context: Context) {
         trySend(emptyList())
 
         awaitClose {
+            /* Flow キャンセル時に NSD を完全停止 → 次の discoverServices() 呼び出しで
+             * Android が新規 mDNS クエリを発行し、キャッシュに依存しない結果が得られる */
             runCatching { nsdManager.stopServiceDiscovery(discoveryListener) }
+            Log.d(TAG, "Discovery stopped and cache cleared")
         }
     }
 }
