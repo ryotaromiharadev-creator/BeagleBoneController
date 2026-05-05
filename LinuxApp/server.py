@@ -85,6 +85,8 @@ async def main():
         addresses=[socket.inet_aton(ip)],
         port=PORT,
         properties={"version": "1.0"},
+        host_ttl=10,
+        other_ttl=10,
     )
 
     async with AsyncZeroconf() as azc:
