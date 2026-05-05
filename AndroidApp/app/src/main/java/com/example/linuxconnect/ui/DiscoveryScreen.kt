@@ -1,5 +1,11 @@
 package com.example.linuxconnect.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,11 +20,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -31,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -44,6 +54,17 @@ fun DiscoveryScreen(
 ) {
     val servers by viewModel.servers.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
+
+    val infiniteTransition = rememberInfiniteTransition(label = "refresh")
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "rotation",
+    )
 
     LaunchedEffect(Unit) {
         viewModel.startDiscovery()
@@ -69,26 +90,34 @@ fun DiscoveryScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // mDNS discovery section
         item {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("自動検出 (mDNS)", style = MaterialTheme.typography.titleSmall)
-                if (isScanning) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("スキャン中", style = MaterialTheme.typography.bodySmall)
-                    }
-                } else {
+                Column {
+                    Text("自動検出 (mDNS)", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        text = "再スキャン",
+                        text = if (isScanning) "スキャン中..." else "${servers.size} 台検出",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable { viewModel.startDiscovery() },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(
+                    onClick = { viewModel.startDiscovery() },
+                    enabled = !isScanning,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "再スキャン",
+                        modifier = Modifier
+                            .size(24.dp)
+                            .rotate(if (isScanning) rotation else 0f),
+                        tint = if (isScanning)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }
@@ -109,7 +138,6 @@ fun DiscoveryScreen(
             }
         }
 
-        // Manual IP input section
         item {
             Spacer(modifier = Modifier.height(8.dp))
             HorizontalDivider()
