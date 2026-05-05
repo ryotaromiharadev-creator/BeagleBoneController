@@ -1,17 +1,39 @@
 # Android build artifacts
 AndroidApp/.gradle/
-AndroidApp/.idea/caches/
 AndroidApp/app/build/
-AndroidApp/local.properties
+AndroidApp/build/
+*.apk
+*.aab
+*.ap_
 
-# Linux compiled binary
-LinuxApp/rc_server
+# Android local config (machine-specific paths)
+local.properties
+
+# Android signing keys
+*.keystore
+*.jks
+*.p12
+
+# IDE
+.idea/
+*.iml
+
+# Linux compiled binaries
 LinuxApp/bench_recv
+LinuxApp/rc_server
+LinuxApp/*.o
+
+# Python
 LinuxApp/.packages/
-
-# Claude settings
-.claude/
-
-# Python cache
 __pycache__/
 *.pyc
+*.pyo
+.venv/
+venv/
+
+# Claude Code local settings
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db

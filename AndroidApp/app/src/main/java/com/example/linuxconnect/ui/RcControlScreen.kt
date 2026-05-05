@@ -2,8 +2,8 @@ package com.example.linuxconnect.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -41,8 +41,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.linuxconnect.model.ServerInfo
 import com.example.linuxconnect.viewmodel.RcViewModel
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.ui.input.pointer.awaitFirstDown
 import kotlin.math.roundToInt
 
 enum class JoystickAxis { VERTICAL, HORIZONTAL }
@@ -56,52 +54,44 @@ fun JoystickView(
     onValueChanged: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val baseDp   = 90.dp
-    val thumbDp  = 28.dp
-    val density  = LocalDensity.current
-    val baseR    = with(density) { baseDp.toPx() }
-    val thumbR   = with(density) { thumbDp.toPx() }
+    val baseDp  = 90.dp
+    val thumbDp = 28.dp
+    val density = LocalDensity.current
+    val baseR   = with(density) { baseDp.toPx() }
+    val thumbR  = with(density) { thumbDp.toPx() }
 
     var thumbOffset by remember { mutableStateOf(Offset.Zero) }
 
     Column(
-        modifier           = modifier,
+        modifier            = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Canvas(
             modifier = Modifier
                 .size(baseDp * 2)
                 .pointerInput(axis, baseR) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        try {
-                            while (true) {
-                                val event   = awaitPointerEvent()
-                                val change  = event.changes.firstOrNull { it.id == down.id }
-                                    ?: break
-                                change.consume()
-                                if (!change.pressed) break
-
-                                val center    = Offset(size.width / 2f, size.height / 2f)
-                                val fromCenter = change.position - center
-                                thumbOffset = when (axis) {
-                                    JoystickAxis.VERTICAL ->
-                                        Offset(0f, fromCenter.y.coerceIn(-baseR, baseR))
-                                    JoystickAxis.HORIZONTAL ->
-                                        Offset(fromCenter.x.coerceIn(-baseR, baseR), 0f)
-                                }
-                                val norm = when (axis) {
-                                    JoystickAxis.VERTICAL   -> -thumbOffset.y / baseR
-                                    JoystickAxis.HORIZONTAL ->  thumbOffset.x / baseR
-                                }
-                                onValueChanged(norm.coerceIn(-1f, 1f))
+                    detectDragGestures(
+                        onDragEnd    = { thumbOffset = Offset.Zero; onValueChanged(0f) },
+                        onDragCancel = { thumbOffset = Offset.Zero; onValueChanged(0f) },
+                        onDrag       = { change, _ ->
+                            change.consume()
+                            val center     = Offset(size.width / 2f, size.height / 2f)
+                            val fromCenter = change.position - center
+                            thumbOffset = when (axis) {
+                                JoystickAxis.VERTICAL ->
+                                    Offset(0f, fromCenter.y.coerceIn(-baseR, baseR))
+                                JoystickAxis.HORIZONTAL ->
+                                    Offset(fromCenter.x.coerceIn(-baseR, baseR), 0f)
                             }
-                        } finally {
-                            thumbOffset = Offset.Zero
-                            onValueChanged(0f)
-                        }
-                    }
-                }
+                            onValueChanged(
+                                when (axis) {
+                                    JoystickAxis.VERTICAL   -> (-thumbOffset.y / baseR).coerceIn(-1f, 1f)
+                                    JoystickAxis.HORIZONTAL -> ( thumbOffset.x / baseR).coerceIn(-1f, 1f)
+                                }
+                            )
+                        },
+                    )
+                },
         ) {
             val center = Offset(size.width / 2f, size.height / 2f)
 
@@ -114,23 +104,23 @@ fun JoystickView(
                 style  = Stroke(width = 2f),
             )
 
-            // Axis guide line
+            // Axis guide
             when (axis) {
                 JoystickAxis.VERTICAL -> {
-                    drawLine(Color(0xFF636366), center.copy(y = center.y - baseR),
-                        center.copy(y = center.y + baseR), 2f)
-                    drawLine(Color(0xFF636366), center.copy(x = center.x - 12f),
-                        center.copy(x = center.x + 12f), 2f)
+                    drawLine(Color(0xFF636366),
+                        center.copy(y = center.y - baseR), center.copy(y = center.y + baseR), 2f)
+                    drawLine(Color(0xFF636366),
+                        center.copy(x = center.x - 12f), center.copy(x = center.x + 12f), 2f)
                 }
                 JoystickAxis.HORIZONTAL -> {
-                    drawLine(Color(0xFF636366), center.copy(x = center.x - baseR),
-                        center.copy(x = center.x + baseR), 2f)
-                    drawLine(Color(0xFF636366), center.copy(y = center.y - 12f),
-                        center.copy(y = center.y + 12f), 2f)
+                    drawLine(Color(0xFF636366),
+                        center.copy(x = center.x - baseR), center.copy(x = center.x + baseR), 2f)
+                    drawLine(Color(0xFF636366),
+                        center.copy(y = center.y - 12f), center.copy(y = center.y + 12f), 2f)
                 }
             }
 
-            // Thumb — outer glow
+            // Thumb — glow
             drawCircle(
                 color  = Color(0x330A84FF),
                 radius = thumbR * 1.5f,
@@ -203,12 +193,13 @@ fun RcControlScreen(
             )
         },
     ) { innerPadding ->
-        Box(
-            modifier = Modifier
+        Column(
+            modifier              = Modifier
                 .fillMaxSize()
                 .background(Color(0xFF000000))
                 .padding(innerPadding),
-            contentAlignment = Alignment.Center,
+            verticalArrangement   = Arrangement.Center,
+            horizontalAlignment   = Alignment.CenterHorizontally,
         ) {
             Row(
                 modifier              = Modifier
@@ -220,15 +211,15 @@ fun RcControlScreen(
                 // ── Left stick: throttle (vertical) ──────────────────────────
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text     = "THROTTLE",
-                        color    = Color(0xFF8E8E93),
-                        fontSize = 11.sp,
+                        text       = "THROTTLE",
+                        color      = Color(0xFF8E8E93),
+                        fontSize   = 11.sp,
                         fontWeight = FontWeight.Medium,
                     )
                     Text(
-                        text     = "${(vm.throttle * 127f).roundToInt()}",
-                        color    = Color.White,
-                        fontSize = 22.sp,
+                        text       = "${(vm.throttle * 127f).roundToInt()}",
+                        color      = Color.White,
+                        fontSize   = 22.sp,
                         fontWeight = FontWeight.Bold,
                     )
                     Spacer(Modifier.height(12.dp))
@@ -239,7 +230,7 @@ fun RcControlScreen(
                     )
                 }
 
-                // ── Centre telemetry display ──────────────────────────────────
+                // ── Centre telemetry ──────────────────────────────────────────
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     val tByte = (vm.throttle * 127f).roundToInt()
                     val sByte = (vm.steering * 127f).roundToInt()
