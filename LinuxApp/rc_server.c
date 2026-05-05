@@ -185,8 +185,12 @@ static void draw_bar(int8_t val) {
 
 static void render(int8_t thr, int8_t str, long pkts, double uptime) {
     static int first = 1;
-    if (!first) printf("\033[4A");   /* 4行上書き */
-    first = 0;
+    if (first) {
+        printf("\033[s");   /* 初回: この位置を保存してから4行描画 */
+        first = 0;
+    } else {
+        printf("\033[u");   /* 2回目以降: 保存位置に戻って上書き */
+    }
 
     printf("\033[2K\rTHROTTLE %+4d  ", thr);
     draw_bar(thr);
